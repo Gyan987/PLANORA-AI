@@ -1,0 +1,13 @@
+[build]
+  command = "npm install --prefix client && cd client && node node_modules/typescript/bin/tsc && node node_modules/vite/bin/vite.js build"
+  publish = "client/dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Single-page app: serve index.html for client-side routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
