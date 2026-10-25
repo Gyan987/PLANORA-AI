@@ -1,6 +1,28 @@
+# Dependencies
 node_modules/
-dist/
-server/.env
+*/node_modules/
 
-# Local Netlify folder
-.netlify
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+server/.env
+*.pem
+
+# Production Builds
+dist/
+*/dist/
+build/
+*/build/
+
+# Testing & Coverage
+coverage/
+*/coverage/
+.nyc_output/
+
+# OS and IDE files 
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
