@@ -6,7 +6,11 @@
 Planora AI transforms celebration planning from fragmented spreadsheets into an intelligent, contextual SaaS command center. Whether orchestrating a grand traditional Bengali wedding in Kolkata, a vibrant milestone birthday, or a community cultural festival, Planora AI solves real event-planning problems through deterministic financial precision, dynamic preparation countdowns, proactive budget rescue, and predictive what-if simulations.
 
 ---
-![Uploading Screenshot 2026-10-25 213906.png…]()
+## 🚀 Planora — AI-Powered Event Planning
+
+<p align="center">
+  <img src="screenshots/planora-preview.png" alt="Planora AI Event Planning Dashboard" width="100%">
+</p>
 
 ## 🌟 Key Features
 
