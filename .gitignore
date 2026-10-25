@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.env
+server/.env
 
 # Local Netlify folder
 .netlify
