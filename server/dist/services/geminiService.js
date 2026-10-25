@@ -10,8 +10,8 @@ exports.generateDeterministicVendors = generateDeterministicVendors;
 exports.generateDeterministicIdeas = generateDeterministicIdeas;
 exports.generateDeterministicRisks = generateDeterministicRisks;
 const genai_1 = require("@google/genai");
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const ai = new genai_1.GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Reads GEMINI_API_KEY (and GOOGLE_GEMINI_BASE_URL on Netlify AI Gateway) from the environment
+const ai = new genai_1.GoogleGenAI({});
 const PRIMARY_MODEL = 'gemini-3.8-flash';
 // Timeout wrapper for external AI calls to guarantee responsiveness
 function withTimeout(promise, ms = process.env.NODE_ENV === 'test' ? 1500 : 7000) {
