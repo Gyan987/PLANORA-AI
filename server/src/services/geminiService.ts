@@ -11,8 +11,8 @@ import {
   WhatIfSimulationResult
 } from '../types';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Reads GEMINI_API_KEY (and GOOGLE_GEMINI_BASE_URL on Netlify AI Gateway) from the environment
+const ai = new GoogleGenAI({});
 const PRIMARY_MODEL = 'gemini-3.8-flash';
 
 // Timeout wrapper for external AI calls to guarantee responsiveness
