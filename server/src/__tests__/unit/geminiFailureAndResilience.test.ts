@@ -42,7 +42,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
       // Mock ai.models.generateContent to throw a network error
       const mockError = new Error('getaddrinfo ENOTFOUND generativelanguage.googleapis.com');
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(mockError);
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(mockError);
 
       const plan = await geminiService.generateCompletePlan({
         name: 'Offline Bengali Wedding',
