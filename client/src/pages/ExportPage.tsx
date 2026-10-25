@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import {
   Calendar,
   CheckCircle2,
@@ -20,10 +18,15 @@ export const ExportPage: React.FC = () => {
 
   if (!activeEvent) return null;
 
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     setIsExporting(true);
 
     try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable')
+      ]);
+
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',

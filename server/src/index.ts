@@ -23,7 +23,9 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} (${duration}ms)`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} (${duration}ms)`);
+    }
   });
   next();
 });
@@ -50,9 +52,15 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`🚀 Planora AI Server running on http://localhost:${PORT}`);
-  console.log(`✨ Gemini Integration: ${process.env.GEMINI_API_KEY ? 'Active (Official @google/genai SDK)' : 'Missing Key'}`);
-  console.log(`====================================================`);
-});
+export { app };
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 Planora AI Server running on http://localhost:${PORT}`);
+    console.log(`✨ Gemini Integration: ${process.env.GEMINI_API_KEY ? 'Active (Official @google/genai SDK)' : 'Missing Key'}`);
+    console.log(`====================================================`);
+  });
+}
+
+export default app;

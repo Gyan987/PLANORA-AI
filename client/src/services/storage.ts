@@ -171,13 +171,14 @@ export const storage = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.EVENTS);
       if (!data) {
-        // Seed initial sample events
-        localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(SAMPLE_EVENTS));
-        return SAMPLE_EVENTS;
+        // Seed initial sample events (clone so SAMPLE_EVENTS is not mutated)
+        const initial = JSON.parse(JSON.stringify(SAMPLE_EVENTS));
+        localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(initial));
+        return initial;
       }
       return JSON.parse(data);
     } catch {
-      return SAMPLE_EVENTS;
+      return JSON.parse(JSON.stringify(SAMPLE_EVENTS));
     }
   },
 

@@ -8,7 +8,8 @@ import {
   Plus,
   Trash2
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Modal } from '../components/common/Modal';
 import { useEventContext } from '../context/EventContext';
 import { DayScheduleItem, PrepTask, TaskPriority } from '../types';
 import { calculateDaysRemaining } from '../utils/currency';
@@ -44,12 +45,14 @@ export const TimelinePage: React.FC = () => {
   const tasks = activeEvent.tasks || [];
   const completedCount = tasks.filter((t) => t.completed).length;
 
-  const filteredTasks = tasks.filter((t) => {
-    if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
-    if (statusFilter === 'Pending' && t.completed) return false;
-    if (statusFilter === 'Completed' && !t.completed) return false;
-    return true;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
+      if (statusFilter === 'Pending' && t.completed) return false;
+      if (statusFilter === 'Completed' && !t.completed) return false;
+      return true;
+    });
+  }, [tasks, priorityFilter, statusFilter]);
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,167 +344,165 @@ export const TimelinePage: React.FC = () => {
       )}
 
       {/* Add Task Modal */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-soft-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Add Preparation Milestone</h3>
-            <p className="text-xs text-slate-500 mb-4">Set a due date and priority for this task.</p>
-
-            <form onSubmit={handleCreateTask} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Milestone Title</label>
-                <input
-                  type="text"
-                  required
-                  value={taskForm.title}
-                  onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                  placeholder="e.g. Confirm Caterer Plate Count"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Priority</label>
-                  <select
-                    value={taskForm.priority}
-                    onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as any })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                  >
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={taskForm.category}
-                    onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
-                    placeholder="e.g. Venue, Catering, Music"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Due Date</label>
-                <input
-                  type="date"
-                  value={taskForm.dueDate}
-                  onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Notes</label>
-                <input
-                  type="text"
-                  value={taskForm.notes}
-                  onChange={(e) => setTaskForm({ ...taskForm, notes: e.target.value })}
-                  placeholder="Additional context or requirements"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsTaskModalOpen(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
-                >
-                  Save Milestone
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        title="Add Preparation Milestone"
+        description="Set a due date and priority for this task."
+        maxWidthClass="max-w-md"
+      >
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Milestone Title</label>
+            <input
+              type="text"
+              required
+              value={taskForm.title}
+              onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+              placeholder="e.g. Confirm Caterer Plate Count"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+            />
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Priority</label>
+              <select
+                value={taskForm.priority}
+                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as any })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+              >
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+              <input
+                type="text"
+                value={taskForm.category}
+                onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
+                placeholder="e.g. Venue, Catering, Music"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Due Date</label>
+            <input
+              type="date"
+              value={taskForm.dueDate}
+              onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Notes</label>
+            <input
+              type="text"
+              value={taskForm.notes}
+              onChange={(e) => setTaskForm({ ...taskForm, notes: e.target.value })}
+              placeholder="Additional context or requirements"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setIsTaskModalOpen(false)}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
+            >
+              Save Milestone
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Add Schedule Modal */}
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-soft-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Add Day-Of Activity</h3>
-            <p className="text-xs text-slate-500 mb-4">Add a time-slotted segment to your itinerary.</p>
-
-            <form onSubmit={handleCreateSchedule} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Time</label>
-                <input
-                  type="text"
-                  required
-                  value={scheduleForm.time}
-                  onChange={(e) => setScheduleForm({ ...scheduleForm, time: e.target.value })}
-                  placeholder="e.g. 06:30 PM"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Activity Name</label>
-                <input
-                  type="text"
-                  required
-                  value={scheduleForm.activity}
-                  onChange={(e) => setScheduleForm({ ...scheduleForm, activity: e.target.value })}
-                  placeholder="e.g. Guest Arrival & Welcome Mocktails"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Location / Area</label>
-                  <input
-                    type="text"
-                    value={scheduleForm.location}
-                    onChange={(e) => setScheduleForm({ ...scheduleForm, location: e.target.value })}
-                    placeholder="e.g. Banquet Foyer"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Responsible Lead</label>
-                  <input
-                    type="text"
-                    value={scheduleForm.responsiblePerson}
-                    onChange={(e) => setScheduleForm({ ...scheduleForm, responsiblePerson: e.target.value })}
-                    placeholder="e.g. Event Coordinator"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
-                >
-                  Save Activity
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        title="Add Day-Of Activity"
+        description="Add a time-slotted segment to your itinerary."
+        maxWidthClass="max-w-md"
+      >
+        <form onSubmit={handleCreateSchedule} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Time</label>
+            <input
+              type="text"
+              required
+              value={scheduleForm.time}
+              onChange={(e) => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+              placeholder="e.g. 06:30 PM"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600 font-bold"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Activity Name</label>
+            <input
+              type="text"
+              required
+              value={scheduleForm.activity}
+              onChange={(e) => setScheduleForm({ ...scheduleForm, activity: e.target.value })}
+              placeholder="e.g. Guest Arrival & Welcome Mocktails"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Location / Area</label>
+              <input
+                type="text"
+                value={scheduleForm.location}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, location: e.target.value })}
+                placeholder="e.g. Banquet Foyer"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Responsible Lead</label>
+              <input
+                type="text"
+                value={scheduleForm.responsiblePerson}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, responsiblePerson: e.target.value })}
+                placeholder="e.g. Event Coordinator"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(false)}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
+            >
+              Save Activity
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

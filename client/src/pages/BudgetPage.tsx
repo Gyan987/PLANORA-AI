@@ -13,7 +13,8 @@ import {
   Trash2,
   Wallet
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Modal } from '../components/common/Modal';
 import {
   Bar,
   BarChart,
@@ -59,14 +60,24 @@ export const BudgetPage: React.FC = () => {
   if (!activeEvent) return null;
 
   const totalBudget = activeEvent.totalBudget || 0;
-  const totalAllocated = (activeEvent.budgetCategories || []).reduce((sum, c) => sum + (c.allocatedAmount || 0), 0);
-  const totalActual = (activeEvent.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const totalAllocated = useMemo(
+    () => (activeEvent.budgetCategories || []).reduce((sum, c) => sum + (c.allocatedAmount || 0), 0),
+    [activeEvent.budgetCategories]
+  );
+  const totalActual = useMemo(
+    () => (activeEvent.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0),
+    [activeEvent.expenses]
+  );
   const remainingBudget = totalBudget - totalActual;
   const isOverBudget = totalActual > totalBudget || totalAllocated > totalBudget;
   const overspendAmount = Math.max(0, Math.max(totalActual, totalAllocated) - totalBudget);
 
-  const reserveCategory = (activeEvent.budgetCategories || []).find((c) =>
-    c.name.toLowerCase().includes('reserve') || c.name.toLowerCase().includes('contingency')
+  const reserveCategory = useMemo(
+    () =>
+      (activeEvent.budgetCategories || []).find(
+        (c) => c.name.toLowerCase().includes('reserve') || c.name.toLowerCase().includes('contingency')
+      ),
+    [activeEvent.budgetCategories]
   );
 
   const handleCreateExpense = (e: React.FormEvent) => {
@@ -122,12 +133,16 @@ export const BudgetPage: React.FC = () => {
     }
   };
 
-  // Bar chart comparing planned vs actual
-  const comparisonData = (activeEvent.budgetCategories || []).map((cat) => ({
-    name: cat.name.split('&')[0].trim(),
-    Planned: cat.allocatedAmount,
-    Actual: cat.actualAmount
-  }));
+  // Bar chart comparing planned vs actual (memoized)
+  const comparisonData = useMemo(
+    () =>
+      (activeEvent.budgetCategories || []).map((cat) => ({
+        name: cat.name.split('&')[0].trim(),
+        Planned: cat.allocatedAmount,
+        Actual: cat.actualAmount
+      })),
+    [activeEvent.budgetCategories]
+  );
 
   return (
     <div className="space-y-6">
@@ -391,95 +406,108 @@ export const BudgetPage: React.FC = () => {
         )}
       </div>
 
-      {/* Add Expense Modal */}
-      {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-soft-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Log New Expense</h3>
-            <p className="text-xs text-slate-500 mb-4">Record an advance or settlement payment.</p>
-
-            <form onSubmit={handleCreateExpense} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Expense Name</label>
-                <input
-                  type="text"
-                  required
-                  value={expenseForm.name}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, name: e.target.value })}
-                  placeholder="e.g. Caterer Tasting Token, Decor Advance"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                <select
-                  value={expenseForm.categoryId}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, categoryId: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                >
-                  {activeEvent.budgetCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name} ({formatINR(cat.allocatedAmount)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Amount (INR)</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: parseInt(e.target.value) || 0 })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600 font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Payment Date</label>
-                  <input
-                    type="date"
-                    value={expenseForm.date}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Notes</label>
-                <input
-                  type="text"
-                  value={expenseForm.notes}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
-                  placeholder="Receipt # or UPI reference ID"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
-                >
-                  Save Expense
-                </button>
-              </div>
-            </form>
+      {/* Add Expense Accessible Modal */}
+      <Modal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        title="Log New Expense"
+        description="Record an advance or settlement payment."
+      >
+        <form onSubmit={handleCreateExpense} className="space-y-4">
+          <div>
+            <label htmlFor="expense-name-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Expense Name
+            </label>
+            <input
+              id="expense-name-input"
+              type="text"
+              required
+              value={expenseForm.name}
+              onChange={(e) => setExpenseForm({ ...expenseForm, name: e.target.value })}
+              placeholder="e.g. Caterer Tasting Token, Decor Advance"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label htmlFor="expense-cat-select" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Category
+            </label>
+            <select
+              id="expense-cat-select"
+              value={expenseForm.categoryId}
+              onChange={(e) => setExpenseForm({ ...expenseForm, categoryId: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {activeEvent.budgetCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({formatINR(cat.allocatedAmount)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="expense-amount-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Amount (INR)
+              </label>
+              <input
+                id="expense-amount-input"
+                type="number"
+                required
+                min="1"
+                value={expenseForm.amount}
+                onChange={(e) => setExpenseForm({ ...expenseForm, amount: parseInt(e.target.value) || 0 })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="expense-date-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Payment Date
+              </label>
+              <input
+                id="expense-date-input"
+                type="date"
+                value={expenseForm.date}
+                onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="expense-notes-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Notes
+            </label>
+            <input
+              id="expense-notes-input"
+              type="text"
+              value={expenseForm.notes}
+              onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
+              placeholder="Receipt # or UPI reference ID"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setIsExpenseModalOpen(false)}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-xl bg-brand-600 px-5 py-2 text-xs font-bold text-white hover:bg-brand-700 transition"
+            >
+              Save Expense
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

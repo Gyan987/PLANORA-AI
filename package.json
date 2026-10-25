@@ -9,6 +9,8 @@
     "build:server": "npm run build --prefix server",
     "build:client": "npm run build --prefix client",
     "build": "npm run build:server && npm run build:client",
+    "test": "npm run test --prefix server && npm run test --prefix client",
+    "test:coverage": "npm run test:coverage --prefix server && npm run test:coverage --prefix client",
     "test:api": "node test-e2e.js",
     "start": "node server/dist/index.js"
   },

@@ -16,12 +16,71 @@ const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const PRIMARY_MODEL = 'gemini-3.8-flash';
 
 // Timeout wrapper for external AI calls to guarantee responsiveness
-function withTimeout<T>(promise: Promise<T>, ms: number = 7000): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number = process.env.NODE_ENV === 'test' ? 1500 : 7000
+): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`AI generation timed out after ${ms}ms`)), ms))
   ]);
 }
+
+// Bounded exponential retry helper for transient network and rate-limit errors
+export async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  retries: number = process.env.NODE_ENV === 'test' ? 1 : 2,
+  baseDelayMs: number = process.env.NODE_ENV === 'test' ? 10 : 200
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      attempt++;
+      if (attempt > retries) throw err;
+      const msg = err?.message?.toLowerCase() || '';
+      const isTransient =
+        msg.includes('429') ||
+        msg.includes('503') ||
+        msg.includes('quota') ||
+        msg.includes('timeout') ||
+        msg.includes('fetch failed');
+      if (!isTransient) throw err;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
+// In-memory TTL cache for safe non-personal, reusable outputs (generic ideas, risk baselines)
+export class NonPersonalTtlCache {
+  private cache = new Map<string, { value: any; expiry: number }>();
+
+  get<T>(key: string): T | null {
+    const item = this.cache.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    return item.value as T;
+  }
+
+  set<T>(key: string, value: T, ttlMs: number = 10 * 60 * 1000): void {
+    if (this.cache.size > 100) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { value, expiry: Date.now() + ttlMs });
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+export const staticAiCache = new NonPersonalTtlCache();
 
 // Helper to calculate realistic milestone dates before event
 export function calculateMilestoneDates(eventDateStr: string, relativeDaysBefore: number[]): string[] {
@@ -482,6 +541,12 @@ export function generateDeterministicRisks(
 }
 
 export class GeminiService {
+  public ai: GoogleGenAI;
+
+  constructor(customAi?: GoogleGenAI) {
+    this.ai = customAi || ai;
+  }
+
   // 1. Full Event Plan Generation
   async generateCompletePlan(params: {
     name: string;
@@ -553,13 +618,15 @@ Return ONLY a valid JSON object matching this schema:
 }`;
 
       const response = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
-        })
+        executeWithRetry(() =>
+          this.ai.models.generateContent({
+            model: PRIMARY_MODEL,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json'
+            }
+          })
+        )
       );
 
       if (response && response.text) {
@@ -668,8 +735,9 @@ Return ONLY a valid JSON object matching this schema:
       ? `Your projected expenses exceed your target budget by ₹${overspend.toLocaleString('en-IN')}. By rationalizing decorative floral imports and streamlining appetizer live counters, you recover ₹${recommendations.reduce((acc, r) => acc + r.savings, 0).toLocaleString('en-IN')} without compromising ceremony dignity.`
       : `Your budget is currently well-balanced. You have ₹${(data.totalBudget - projectedOrActual).toLocaleString('en-IN')} unallocated headroom.`;
 
-    try {
-      const prompt = `You are a Chief Event Budget Auditor.
+    if (overspend > 0) {
+      try {
+        const prompt = `You are a Chief Event Budget Auditor.
 Event: ${data.eventType} in ${data.city} for ${data.guests} guests.
 Total Budget: ₹${data.totalBudget} INR.
 Current Expenses / Allocation: ₹${projectedOrActual} INR.
@@ -688,20 +756,23 @@ Provide a concise, practical financial rescue plan. Return JSON:
   ]
 }`;
 
-      const res = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: prompt,
-          config: { responseMimeType: 'application/json' }
-        })
-      );
+        const res = await withTimeout(
+          executeWithRetry(() =>
+            this.ai.models.generateContent({
+              model: PRIMARY_MODEL,
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+            })
+          )
+        );
 
-      if (res && res.text) {
-        const parsed = extractJsonFromText(res.text);
-        if (parsed.explanation) aiExplanation = parsed.explanation;
+        if (res && res.text) {
+          const parsed = extractJsonFromText(res.text);
+          if (parsed.explanation) aiExplanation = parsed.explanation;
+        }
+      } catch (e: any) {
+        console.warn('Gemini rescueBudget notice:', e.message);
       }
-    } catch (e: any) {
-      console.warn('Gemini rescueBudget notice:', e.message);
     }
 
     return {
@@ -792,11 +863,13 @@ Analyze this scenario and return JSON:
 }`;
 
       const res = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: prompt,
-          config: { responseMimeType: 'application/json' }
-        })
+        executeWithRetry(() =>
+          this.ai.models.generateContent({
+            model: PRIMARY_MODEL,
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+          })
+        )
       );
 
       if (res && res.text) {
@@ -885,10 +958,12 @@ Guidelines:
       const fullPrompt = `${systemContext}\n\nRecent Conversation:\n${promptHistory}\n\nUser: ${message}\nPlanora AI:`;
 
       const res = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: fullPrompt
-        })
+        executeWithRetry(() =>
+          this.ai.models.generateContent({
+            model: PRIMARY_MODEL,
+            contents: fullPrompt
+          })
+        )
       );
 
       if (res && res.text) {
@@ -911,6 +986,10 @@ Guidelines:
     totalBudget: number;
     category?: string;
   }): Promise<EventIdea[]> {
+    const cacheKey = `ideas-${params.eventType}-${params.culturalTradition || ''}-${params.theme || ''}-${params.city}-${params.guests}-${params.totalBudget}-${params.category || ''}`;
+    const cached = staticAiCache.get<EventIdea[]>(cacheKey);
+    if (cached) return cached;
+
     const baseIdeas = generateDeterministicIdeas(params.eventType, params.culturalTradition, params.theme, params.city);
 
     try {
@@ -933,11 +1012,13 @@ Return JSON array of 4 objects matching:
 ]`;
 
       const res = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: prompt,
-          config: { responseMimeType: 'application/json' }
-        })
+        executeWithRetry(() =>
+          this.ai.models.generateContent({
+            model: PRIMARY_MODEL,
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+          })
+        )
       );
 
       if (res && res.text) {
@@ -968,6 +1049,10 @@ Return JSON array of 4 objects matching:
     const diffDays = Math.max(1, Math.round((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     const baseRisks = generateDeterministicRisks(eventPlan.indoorOutdoor, diffDays, eventPlan.totalBudget);
 
+    const cacheKey = `risks-${eventPlan.type}-${eventPlan.indoorOutdoor}-${diffDays}-${eventPlan.totalBudget}`;
+    const cachedRisks = staticAiCache.get<EventRisk[]>(cacheKey);
+    if (cachedRisks) return cachedRisks;
+
     try {
       const prompt = `You are a Risk Management Officer for Events.
 Analyze this plan:
@@ -992,11 +1077,13 @@ Return JSON array of 4 realistic risks:
 ]`;
 
       const res = await withTimeout(
-        ai.models.generateContent({
-          model: PRIMARY_MODEL,
-          contents: prompt,
-          config: { responseMimeType: 'application/json' }
-        })
+        executeWithRetry(() =>
+          this.ai.models.generateContent({
+            model: PRIMARY_MODEL,
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+          })
+        )
       );
 
       if (res && res.text) {
