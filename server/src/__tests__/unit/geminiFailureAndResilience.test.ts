@@ -29,6 +29,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
     vendors: [],
     ideas: [],
     risks: [],
+    contingencySuggestions: ['Always secure indoor backup for weather fluctuations.'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -42,7 +43,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
       // Mock ai.models.generateContent to throw a network error
       const mockError = new Error('getaddrinfo ENOTFOUND generativelanguage.googleapis.com');
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(mockError);
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(mockError);
 
       const plan = await geminiService.generateCompletePlan({
         name: 'Offline Bengali Wedding',
@@ -89,7 +90,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
     it('handles rate-limiting HTTP 429 / 503 without crashing', async () => {
       const rateLimitError = new Error('Resource has been exhausted (e.g. check quota). HTTP 429');
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(rateLimitError);
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(rateLimitError);
 
       const plan = await geminiService.generateCompletePlan({
         name: 'Rate Limited Event',
@@ -133,7 +134,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
     it('computes deterministic financial cuts when Gemini service times out or errors', async () => {
       const timeoutError = new Error('AI generation timed out after 7000ms');
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(timeoutError);
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(timeoutError);
 
       const rescueResult = await geminiService.rescueBudget({
         totalBudget: 400000,
@@ -173,7 +174,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
   describe('simulateWhatIf Resilience', () => {
     it('computes deterministic cost per guest and feasibility even when AI call fails', async () => {
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(new Error('Gemini API Error'));
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(new Error('Gemini API Error'));
 
       const result = await geminiService.simulateWhatIf(sampleEventPlan, {
         guests: 300, // Doubling guests without increasing budget
@@ -193,7 +194,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
   describe('chatWithAssistant Resilience', () => {
     it('provides grounded fallback response with event figures when Gemini throws an error', async () => {
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(new Error('Quota exceeded'));
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(new Error('Quota exceeded'));
 
       const reply = await geminiService.chatWithAssistant(
         'What should I prioritize?',
@@ -210,7 +211,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
   describe('analyzeRisks & getPersonalizedIdeas Resilience', () => {
     it('returns deterministic risks when Gemini analysis fails', async () => {
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(new Error('Network error'));
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(new Error('Network error'));
 
       const risks = await geminiService.analyzeRisks(sampleEventPlan);
       expect(risks.length).toBeGreaterThanOrEqual(3);
@@ -219,7 +220,7 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
 
     it('returns deterministic ideas when Gemini ideas call fails', async () => {
       // @ts-ignore
-      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValueOnce(new Error('Network error'));
+      vi.spyOn(geminiService['ai'].models, 'generateContent').mockRejectedValue(new Error('Network error'));
 
       const ideas = await geminiService.getPersonalizedIdeas({
         eventType: 'wedding',

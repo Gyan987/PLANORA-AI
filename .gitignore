@@ -20,7 +20,7 @@ coverage/
 */coverage/
 .nyc_output/
 
-# OS and IDE files
+# OS and IDE files 
 .DS_Store
 Thumbs.db
 *.log

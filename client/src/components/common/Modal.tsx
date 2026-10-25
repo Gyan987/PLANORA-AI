@@ -8,6 +8,7 @@ export interface ModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidth?: string;
+  maxWidthClass?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -16,8 +17,10 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   description,
   children,
-  maxWidth = 'max-w-md'
+  maxWidth = 'max-w-md',
+  maxWidthClass
 }) => {
+  const modalWidth = maxWidthClass || maxWidth;
   const id = useId();
   const titleId = `modal-title-${id}`;
   const descId = `modal-desc-${id}`;
@@ -57,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
-        className={`w-full ${maxWidth} rounded-3xl border border-slate-200 bg-white p-6 shadow-soft-2xl dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-150 relative`}
+        className={`w-full ${modalWidth} rounded-3xl border border-slate-200 bg-white p-6 shadow-soft-2xl dark:border-slate-800 dark:bg-slate-900 animate-in zoom-in-95 duration-150 relative`}
       >
         <div className="flex items-start justify-between mb-4">
           <div>

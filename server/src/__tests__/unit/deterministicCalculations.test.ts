@@ -61,7 +61,7 @@ describe('Deterministic Financial & Planning Calculations', () => {
         expect(cat.allocatedAmount).toBe(0);
         expect(cat.actualAmount).toBe(0);
         expect(cat.percentage).toBe(0);
-        expect(isNaN(cat.percentage)).toBe(false);
+        expect(isNaN(cat.percentage!)).toBe(false);
       });
     });
 

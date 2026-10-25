@@ -3,6 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.aiController = exports.AiController = void 0;
 const aiSchemas_1 = require("../schemas/aiSchemas");
 const geminiService_1 = require("../services/geminiService");
+function getErrorMessage(error) {
+    if (error instanceof Error)
+        return error.message;
+    return 'An unexpected error occurred';
+}
 class AiController {
     // POST /api/ai/generate-plan
     async generatePlan(req, res) {
@@ -21,10 +26,13 @@ class AiController {
             });
         }
         catch (error) {
-            console.error('Error in generatePlan controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in generatePlan controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to generate event plan',
-                message: error.message
+                message
             });
         }
     }
@@ -45,10 +53,13 @@ class AiController {
             });
         }
         catch (error) {
-            console.error('Error in budgetRescue controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in budgetRescue controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to perform budget rescue',
-                message: error.message
+                message
             });
         }
     }
@@ -62,17 +73,21 @@ class AiController {
                     details: validation.error.errors
                 });
             }
-            const result = await geminiService_1.geminiService.simulateWhatIf(validation.data.currentPlan, validation.data.simulatedChanges);
+            const currentPlan = validation.data.currentPlan;
+            const result = await geminiService_1.geminiService.simulateWhatIf(currentPlan, validation.data.simulatedChanges);
             return res.status(200).json({
                 success: true,
                 data: result
             });
         }
         catch (error) {
-            console.error('Error in simulateWhatIf controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in simulateWhatIf controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to simulate what-if scenario',
-                message: error.message
+                message
             });
         }
     }
@@ -87,17 +102,21 @@ class AiController {
                 });
             }
             const { message, history, eventContext } = validation.data;
-            const chatResponse = await geminiService_1.geminiService.chatWithAssistant(message, history, eventContext);
+            const contextPlan = eventContext;
+            const chatResponse = await geminiService_1.geminiService.chatWithAssistant(message, history, contextPlan);
             return res.status(200).json({
                 success: true,
                 data: chatResponse
             });
         }
         catch (error) {
-            console.error('Error in chatAssistant controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in chatAssistant controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to get chat response',
-                message: error.message
+                message
             });
         }
     }
@@ -118,10 +137,13 @@ class AiController {
             });
         }
         catch (error) {
-            console.error('Error in getIdeas controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in getIdeas controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to get personalized ideas',
-                message: error.message
+                message
             });
         }
     }
@@ -135,17 +157,21 @@ class AiController {
                     details: validation.error.errors
                 });
             }
-            const risks = await geminiService_1.geminiService.analyzeRisks(validation.data.eventPlan);
+            const eventPlan = validation.data.eventPlan;
+            const risks = await geminiService_1.geminiService.analyzeRisks(eventPlan);
             return res.status(200).json({
                 success: true,
                 data: risks
             });
         }
         catch (error) {
-            console.error('Error in analyzeRisks controller:', error);
+            const message = getErrorMessage(error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Error in analyzeRisks controller:', error);
+            }
             return res.status(500).json({
                 error: 'Failed to analyze risks',
-                message: error.message
+                message
             });
         }
     }

@@ -3,12 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.app = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const aiRoutes_1 = __importDefault(require("./routes/aiRoutes"));
 const app = (0, express_1.default)();
+exports.app = app;
 const PORT = process.env.PORT || 5000;
 // Middleware
 app.use((0, cors_1.default)({
@@ -22,7 +24,9 @@ app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - start;
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} (${duration}ms)`);
+        if (process.env.NODE_ENV !== 'test') {
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} (${duration}ms)`);
+        }
     });
     next();
 });
@@ -45,9 +49,12 @@ app.use((err, req, res, next) => {
         message: err.message || 'An unexpected error occurred'
     });
 });
-app.listen(PORT, () => {
-    console.log(`====================================================`);
-    console.log(`🚀 Planora AI Server running on http://localhost:${PORT}`);
-    console.log(`✨ Gemini Integration: ${process.env.GEMINI_API_KEY ? 'Active (Official @google/genai SDK)' : 'Missing Key'}`);
-    console.log(`====================================================`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`====================================================`);
+        console.log(`🚀 Planora AI Server running on http://localhost:${PORT}`);
+        console.log(`✨ Gemini Integration: ${process.env.GEMINI_API_KEY ? 'Active (Official @google/genai SDK)' : 'Missing Key'}`);
+        console.log(`====================================================`);
+    });
+}
+exports.default = app;

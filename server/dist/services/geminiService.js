@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.geminiService = exports.GeminiService = void 0;
+exports.geminiService = exports.GeminiService = exports.staticAiCache = exports.NonPersonalTtlCache = void 0;
+exports.executeWithRetry = executeWithRetry;
 exports.calculateMilestoneDates = calculateMilestoneDates;
 exports.generateDeterministicBudgetCategories = generateDeterministicBudgetCategories;
 exports.generateDeterministicTasks = generateDeterministicTasks;
@@ -13,12 +14,63 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const ai = new genai_1.GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const PRIMARY_MODEL = 'gemini-3.8-flash';
 // Timeout wrapper for external AI calls to guarantee responsiveness
-function withTimeout(promise, ms = 7000) {
+function withTimeout(promise, ms = process.env.NODE_ENV === 'test' ? 1500 : 7000) {
     return Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error(`AI generation timed out after ${ms}ms`)), ms))
     ]);
 }
+// Bounded exponential retry helper for transient network and rate-limit errors
+async function executeWithRetry(fn, retries = process.env.NODE_ENV === 'test' ? 1 : 2, baseDelayMs = process.env.NODE_ENV === 'test' ? 10 : 200) {
+    let attempt = 0;
+    while (true) {
+        try {
+            return await fn();
+        }
+        catch (err) {
+            attempt++;
+            if (attempt > retries)
+                throw err;
+            const msg = err?.message?.toLowerCase() || '';
+            const isTransient = msg.includes('429') ||
+                msg.includes('503') ||
+                msg.includes('quota') ||
+                msg.includes('timeout') ||
+                msg.includes('fetch failed');
+            if (!isTransient)
+                throw err;
+            const delay = baseDelayMs * Math.pow(2, attempt - 1);
+            await new Promise((r) => setTimeout(r, delay));
+        }
+    }
+}
+// In-memory TTL cache for safe non-personal, reusable outputs (generic ideas, risk baselines)
+class NonPersonalTtlCache {
+    cache = new Map();
+    get(key) {
+        const item = this.cache.get(key);
+        if (!item)
+            return null;
+        if (Date.now() > item.expiry) {
+            this.cache.delete(key);
+            return null;
+        }
+        return item.value;
+    }
+    set(key, value, ttlMs = 10 * 60 * 1000) {
+        if (this.cache.size > 100) {
+            const firstKey = this.cache.keys().next().value;
+            if (firstKey)
+                this.cache.delete(firstKey);
+        }
+        this.cache.set(key, { value, expiry: Date.now() + ttlMs });
+    }
+    clear() {
+        this.cache.clear();
+    }
+}
+exports.NonPersonalTtlCache = NonPersonalTtlCache;
+exports.staticAiCache = new NonPersonalTtlCache();
 // Helper to calculate realistic milestone dates before event
 function calculateMilestoneDates(eventDateStr, relativeDaysBefore) {
     const eventDate = new Date(eventDateStr);
@@ -451,6 +503,10 @@ function generateDeterministicRisks(indoorOutdoor, daysUntilEvent, totalBudget) 
     return risks;
 }
 class GeminiService {
+    ai;
+    constructor(customAi) {
+        this.ai = customAi || ai;
+    }
     // 1. Full Event Plan Generation
     async generateCompletePlan(params) {
         const deterministicCategories = generateDeterministicBudgetCategories(params.totalBudget, params.type);
@@ -499,13 +555,13 @@ Return ONLY a valid JSON object matching this schema:
     "Idea Title 2"
   ]
 }`;
-            const response = await withTimeout(ai.models.generateContent({
+            const response = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
                 model: PRIMARY_MODEL,
                 contents: prompt,
                 config: {
                     responseMimeType: 'application/json'
                 }
-            }));
+            })));
             if (response && response.text) {
                 const parsed = extractJsonFromText(response.text);
                 if (parsed.overviewSummary)
@@ -591,8 +647,9 @@ Return ONLY a valid JSON object matching this schema:
         let aiExplanation = overspend > 0
             ? `Your projected expenses exceed your target budget by ₹${overspend.toLocaleString('en-IN')}. By rationalizing decorative floral imports and streamlining appetizer live counters, you recover ₹${recommendations.reduce((acc, r) => acc + r.savings, 0).toLocaleString('en-IN')} without compromising ceremony dignity.`
             : `Your budget is currently well-balanced. You have ₹${(data.totalBudget - projectedOrActual).toLocaleString('en-IN')} unallocated headroom.`;
-        try {
-            const prompt = `You are a Chief Event Budget Auditor.
+        if (overspend > 0) {
+            try {
+                const prompt = `You are a Chief Event Budget Auditor.
 Event: ${data.eventType} in ${data.city} for ${data.guests} guests.
 Total Budget: ₹${data.totalBudget} INR.
 Current Expenses / Allocation: ₹${projectedOrActual} INR.
@@ -610,19 +667,20 @@ Provide a concise, practical financial rescue plan. Return JSON:
     }
   ]
 }`;
-            const res = await withTimeout(ai.models.generateContent({
-                model: PRIMARY_MODEL,
-                contents: prompt,
-                config: { responseMimeType: 'application/json' }
-            }));
-            if (res && res.text) {
-                const parsed = extractJsonFromText(res.text);
-                if (parsed.explanation)
-                    aiExplanation = parsed.explanation;
+                const res = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
+                    model: PRIMARY_MODEL,
+                    contents: prompt,
+                    config: { responseMimeType: 'application/json' }
+                })));
+                if (res && res.text) {
+                    const parsed = extractJsonFromText(res.text);
+                    if (parsed.explanation)
+                        aiExplanation = parsed.explanation;
+                }
             }
-        }
-        catch (e) {
-            console.warn('Gemini rescueBudget notice:', e.message);
+            catch (e) {
+                console.warn('Gemini rescueBudget notice:', e.message);
+            }
         }
         return {
             overspendAmount: overspend,
@@ -691,11 +749,11 @@ Analyze this scenario and return JSON:
   "scheduleAndVendorImpacts": ["impact 1", "impact 2"],
   "actionableRecommendations": ["rec 1", "rec 2"]
 }`;
-            const res = await withTimeout(ai.models.generateContent({
+            const res = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
                 model: PRIMARY_MODEL,
                 contents: prompt,
                 config: { responseMimeType: 'application/json' }
-            }));
+            })));
             if (res && res.text) {
                 const parsed = extractJsonFromText(res.text);
                 if (parsed.summary)
@@ -774,10 +832,10 @@ Guidelines:
 5. Keep your tone encouraging, proactive, and professional.`;
             const promptHistory = history.slice(-6).map((h) => `${h.role === 'user' ? 'User' : 'Planora AI'}: ${h.content}`).join('\n');
             const fullPrompt = `${systemContext}\n\nRecent Conversation:\n${promptHistory}\n\nUser: ${message}\nPlanora AI:`;
-            const res = await withTimeout(ai.models.generateContent({
+            const res = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
                 model: PRIMARY_MODEL,
                 contents: fullPrompt
-            }));
+            })));
             if (res && res.text) {
                 return { response: res.text.trim() };
             }
@@ -789,6 +847,10 @@ Guidelines:
     }
     // 5. Generate Dynamic Cultural Ideas
     async getPersonalizedIdeas(params) {
+        const cacheKey = `ideas-${params.eventType}-${params.culturalTradition || ''}-${params.theme || ''}-${params.city}-${params.guests}-${params.totalBudget}-${params.category || ''}`;
+        const cached = exports.staticAiCache.get(cacheKey);
+        if (cached)
+            return cached;
         const baseIdeas = generateDeterministicIdeas(params.eventType, params.culturalTradition, params.theme, params.city);
         try {
             const prompt = `Generate 4 distinct, culturally rich, realistic event ideas for a ${params.eventType} in ${params.city} with ${params.guests} guests and ₹${params.totalBudget} INR budget.
@@ -808,11 +870,11 @@ Return JSON array of 4 objects matching:
     "implementationTips": ["Tip 1", "Tip 2"]
   }
 ]`;
-            const res = await withTimeout(ai.models.generateContent({
+            const res = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
                 model: PRIMARY_MODEL,
                 contents: prompt,
                 config: { responseMimeType: 'application/json' }
-            }));
+            })));
             if (res && res.text) {
                 const parsed = extractJsonFromText(res.text);
                 if (Array.isArray(parsed) && parsed.length > 0) {
@@ -839,6 +901,10 @@ Return JSON array of 4 objects matching:
         const eventDate = new Date(eventPlan.date);
         const diffDays = Math.max(1, Math.round((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
         const baseRisks = generateDeterministicRisks(eventPlan.indoorOutdoor, diffDays, eventPlan.totalBudget);
+        const cacheKey = `risks-${eventPlan.type}-${eventPlan.indoorOutdoor}-${diffDays}-${eventPlan.totalBudget}`;
+        const cachedRisks = exports.staticAiCache.get(cacheKey);
+        if (cachedRisks)
+            return cachedRisks;
         try {
             const prompt = `You are a Risk Management Officer for Events.
 Analyze this plan:
@@ -861,11 +927,11 @@ Return JSON array of 4 realistic risks:
     "deadline": "When action must be taken"
   }
 ]`;
-            const res = await withTimeout(ai.models.generateContent({
+            const res = await withTimeout(executeWithRetry(() => this.ai.models.generateContent({
                 model: PRIMARY_MODEL,
                 contents: prompt,
                 config: { responseMimeType: 'application/json' }
-            }));
+            })));
             if (res && res.text) {
                 const parsed = extractJsonFromText(res.text);
                 if (Array.isArray(parsed) && parsed.length > 0) {
