@@ -65,6 +65,35 @@ describe('Deterministic Financial & Planning Calculations', () => {
       });
     });
 
+    it('allocates exactly ₹199 without producing ₹200 (regression test for exact-sum algorithm)', () => {
+      const totalBudget = 199;
+      const categories = generateDeterministicBudgetCategories(totalBudget, 'wedding');
+      const allocatedSum = categories.reduce((sum, c) => sum + c.allocatedAmount, 0);
+
+      // Must be exactly 199, never 200
+      expect(allocatedSum).toBe(199);
+      expect(allocatedSum).not.toBe(200);
+
+      // Every category must have a non-negative integer allocation
+      categories.forEach((cat) => {
+        expect(Number.isInteger(cat.allocatedAmount)).toBe(true);
+        expect(cat.allocatedAmount).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    it('allocates exact sums for small irregular budgets (₹1, ₹7, ₹23, ₹99, ₹199) across event types', () => {
+      const smallBudgets = [1, 7, 23, 99, 199];
+      const eventTypes: EventType[] = ['wedding', 'birthday', 'community', 'custom' as EventType];
+
+      smallBudgets.forEach((budget) => {
+        eventTypes.forEach((type) => {
+          const categories = generateDeterministicBudgetCategories(budget, type);
+          const allocatedSum = categories.reduce((sum, c) => sum + c.allocatedAmount, 0);
+          expect(allocatedSum).toBe(budget);
+        });
+      });
+    });
+
     it('handles floating point budgets without precision leaks', () => {
       const totalBudget = 333333;
       const categories = generateDeterministicBudgetCategories(totalBudget, 'wedding');
@@ -72,11 +101,13 @@ describe('Deterministic Financial & Planning Calculations', () => {
       expect(allocatedSum).toBe(totalBudget);
     });
 
-    it('handles extremely large budgets without integer overflow', () => {
-      const totalBudget = 50000000; // ₹5 Crore
-      const categories = generateDeterministicBudgetCategories(totalBudget, 'wedding');
-      const allocatedSum = categories.reduce((sum, c) => sum + c.allocatedAmount, 0);
-      expect(allocatedSum).toBe(totalBudget);
+    it('allocates exact sums for large and irregular budgets (₹1,234,567 and ₹99,999,999)', () => {
+      const largeBudgets = [1234567, 50000000, 99999999];
+      largeBudgets.forEach((budget) => {
+        const categories = generateDeterministicBudgetCategories(budget, 'wedding');
+        const allocatedSum = categories.reduce((sum, c) => sum + c.allocatedAmount, 0);
+        expect(allocatedSum).toBe(budget);
+      });
     });
   });
 

@@ -38,7 +38,12 @@ interface EventContextType {
   // Ideas
   saveIdeaToPlan: (idea: EventIdea) => void;
   // What-If & Budget Rescue
-  applySimulation: (proposedBudget: number, proposedGuests: number, categories: BudgetCategory[]) => void;
+  applySimulation: (
+    proposedBudget: number,
+    proposedGuests: number,
+    categories: BudgetCategory[],
+    options?: { durationHours?: number; indoorOutdoor?: 'Indoor' | 'Outdoor' | 'Hybrid' }
+  ) => void;
   applyBudgetRescue: (categories: BudgetCategory[]) => void;
 }
 
@@ -204,12 +209,19 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Apply Simulation
-  const applySimulation = (proposedBudget: number, proposedGuests: number, categories: BudgetCategory[]) => {
+  const applySimulation = (
+    proposedBudget: number,
+    proposedGuests: number,
+    categories: BudgetCategory[],
+    options?: { durationHours?: number; indoorOutdoor?: 'Indoor' | 'Outdoor' | 'Hybrid' }
+  ) => {
     if (!activeEvent) return;
     updateActiveEvent({
       totalBudget: proposedBudget,
       guests: proposedGuests,
-      budgetCategories: categories
+      budgetCategories: categories,
+      ...(options?.durationHours !== undefined ? { durationHours: options.durationHours } : {}),
+      ...(options?.indoorOutdoor !== undefined ? { indoorOutdoor: options.indoorOutdoor } : {})
     });
   };
 

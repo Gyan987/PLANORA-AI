@@ -184,6 +184,13 @@ describe('Gemini API Failure & Resilience Unit Tests', () => {
       expect(result).toBeDefined();
       expect(result.originalValues.guests).toBe(150);
       expect(result.proposedValues.guests).toBe(300);
+
+      // Verify venue and catering estimates are properly mapped (not swapped)
+      expect(result.originalValues.venueEstimate).toBe(120000); // Venue & Space
+      expect(result.originalValues.cateringEstimate).toBe(140000); // Catering & Food
+      expect(result.proposedValues.venueEstimate).toBeGreaterThan(0);
+      expect(result.proposedValues.cateringEstimate).toBeGreaterThan(0);
+
       expect(result.budgetImpact.feasibility).toBe('Deficit');
       expect(result.tradeOffs.length).toBeGreaterThan(0);
       expect(result.scheduleAndVendorImpacts.length).toBeGreaterThan(0);

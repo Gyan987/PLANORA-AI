@@ -141,28 +141,54 @@ function generateDeterministicBudgetCategories(totalBudget, eventType) {
             'Emergency Reserve': { pct: 0.07, color: '#64748B', notes: 'Buffer for last-minute needs' }
         };
     }
-    const categories = [];
-    let allocatedSum = 0;
+    const roundedTotal = Math.max(0, Math.round(totalBudget));
     const entries = Object.entries(weights);
-    entries.forEach(([name, meta], index) => {
-        let amount;
-        if (index === entries.length - 1) {
-            amount = Math.max(0, totalBudget - allocatedSum); // exact remainder ensures 100% sum
-        }
-        else {
-            amount = Math.round((totalBudget * meta.pct) / 100) * 100;
-            allocatedSum += amount;
-        }
-        const actualPct = totalBudget > 0 ? Number(((amount / totalBudget) * 100).toFixed(1)) : 0;
-        categories.push({
+    if (roundedTotal === 0) {
+        return entries.map(([name, meta], index) => ({
             id: `cat-${index + 1}`,
             name,
+            allocatedAmount: 0,
+            actualAmount: 0,
+            percentage: 0,
+            notes: meta.notes,
+            color: meta.color
+        }));
+    }
+    // Exact-sum allocation using Largest Remainder Method (Hamilton's / Hare-Niemeyer method).
+    // Guarantees sum of allocations strictly matches roundedTotal for any integer budget (small, large, or irregular).
+    const unrounded = entries.map(([name, meta], index) => {
+        const rawAmount = roundedTotal * meta.pct;
+        const floorAmount = Math.floor(rawAmount);
+        const remainder = rawAmount - floorAmount;
+        return { name, meta, index, floorAmount, remainder };
+    });
+    const floorSum = unrounded.reduce((sum, item) => sum + item.floorAmount, 0);
+    const remainderDiff = roundedTotal - floorSum;
+    // Sort by remainder descending, tie-breaking by initial index for deterministic consistency
+    const sortedByRemainder = [...unrounded].sort((a, b) => {
+        if (b.remainder !== a.remainder)
+            return b.remainder - a.remainder;
+        return a.index - b.index;
+    });
+    const allocations = new Map();
+    unrounded.forEach((item) => allocations.set(item.index, item.floorAmount));
+    // Distribute the exact integer delta to the highest remainder categories
+    for (let i = 0; i < remainderDiff; i++) {
+        const target = sortedByRemainder[i % sortedByRemainder.length];
+        allocations.set(target.index, (allocations.get(target.index) || 0) + 1);
+    }
+    const categories = unrounded.map((item) => {
+        const amount = allocations.get(item.index) || 0;
+        const actualPct = Number(((amount / roundedTotal) * 100).toFixed(1));
+        return {
+            id: `cat-${item.index + 1}`,
+            name: item.name,
             allocatedAmount: amount,
             actualAmount: 0,
             percentage: actualPct,
-            notes: meta.notes,
-            color: meta.color
-        });
+            notes: item.meta.notes,
+            color: item.meta.color
+        };
     });
     return categories;
 }
@@ -777,15 +803,15 @@ Analyze this scenario and return JSON:
                 totalBudget: origBudget,
                 guests: origGuests,
                 costPerGuest: origCostPerGuest,
-                venueEstimate: cateringCatOrig?.allocatedAmount || 0,
-                cateringEstimate: venueCatOrig?.allocatedAmount || 0
+                venueEstimate: venueCatOrig?.allocatedAmount || 0,
+                cateringEstimate: cateringCatOrig?.allocatedAmount || 0
             },
             proposedValues: {
                 totalBudget: proposedBudget,
                 guests: proposedGuests,
                 costPerGuest: proposedCostPerGuest,
-                venueEstimate: cateringCatProp?.allocatedAmount || 0,
-                cateringEstimate: venueCatProp?.allocatedAmount || 0
+                venueEstimate: venueCatProp?.allocatedAmount || 0,
+                cateringEstimate: cateringCatProp?.allocatedAmount || 0
             },
             budgetImpact: {
                 difference: budgetDiff,

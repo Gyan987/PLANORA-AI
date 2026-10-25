@@ -11,6 +11,9 @@ import { geminiService } from '../services/geminiService';
 import { EventPlan } from '../types';
 
 function getErrorMessage(error: unknown): string {
+  if (process.env.NODE_ENV === 'production') {
+    return 'An unexpected error occurred while processing your request. Please try again later.';
+  }
   if (error instanceof Error) return error.message;
   return 'An unexpected error occurred';
 }

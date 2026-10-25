@@ -4,6 +4,9 @@ exports.aiController = exports.AiController = void 0;
 const aiSchemas_1 = require("../schemas/aiSchemas");
 const geminiService_1 = require("../services/geminiService");
 function getErrorMessage(error) {
+    if (process.env.NODE_ENV === 'production') {
+        return 'An unexpected error occurred while processing your request. Please try again later.';
+    }
     if (error instanceof Error)
         return error.message;
     return 'An unexpected error occurred';

@@ -175,11 +175,16 @@ describe('EventContext Integration Tests', () => {
     }));
 
     act(() => {
-      result.current.applySimulation(newBudget, newGuests, modifiedCategories);
+      result.current.applySimulation(newBudget, newGuests, modifiedCategories, {
+        durationHours: 10,
+        indoorOutdoor: 'Outdoor'
+      });
     });
 
     expect(result.current.activeEvent.totalBudget).toBe(newBudget);
     expect(result.current.activeEvent.guests).toBe(newGuests);
+    expect(result.current.activeEvent.durationHours).toBe(10);
+    expect(result.current.activeEvent.indoorOutdoor).toBe('Outdoor');
     expect(result.current.activeEvent.budgetCategories[0].allocatedAmount).toBe(modifiedCategories[0].allocatedAmount);
   });
 

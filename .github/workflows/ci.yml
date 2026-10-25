@@ -1,0 +1,43 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-build:
+    name: TypeCheck, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install --prefix server
+          npm install --prefix client
+
+      - name: Run TypeScript Checks
+        run: |
+          npm run build --prefix server
+          npx tsc --noEmit --project client/tsconfig.json
+
+      - name: Run Automated Tests with Coverage
+        run: |
+          npm run test:coverage
+        env:
+          NODE_ENV: test
+
+      - name: Run Production Bundle Build
+        run: |
+          npm run build

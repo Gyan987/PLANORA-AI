@@ -1,37 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profile: only owner can read and write
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Events: only the authenticated owner can access their own events
-    match /events/{eventId} {
-      allow read, write, delete: if request.auth != null && (
-        resource == null || resource.data.userId == request.auth.uid
+    function isEventOwner(eventId) {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/events/$(eventId)).data.userId == request.auth.uid
       );
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
 
-      // Subcollections for expenses, tasks, vendors, chat, simulations
+    // User profile: only owner can read and write
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Events: only the authenticated owner can access, update, or delete their own events
+    match /events/{eventId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Prevent unauthorized ownership changes during updates
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+
+      // Subcollections: strictly enforce parent event ownership verification
       match /expenses/{expenseId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isEventOwner(eventId);
       }
 
       match /tasks/{taskId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isEventOwner(eventId);
       }
 
       match /vendors/{vendorId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isEventOwner(eventId);
       }
 
       match /chats/{chatId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isEventOwner(eventId);
       }
 
       match /simulations/{simId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isEventOwner(eventId);
       }
     }
   }

@@ -53,7 +53,10 @@ export const WhatIfPage: React.FC = () => {
 
   const handleApplyToEvent = () => {
     if (simResult && simResult.proposedCategories) {
-      applySimulation(simBudget, simGuests, simResult.proposedCategories);
+      applySimulation(simBudget, simGuests, simResult.proposedCategories, {
+        durationHours: simDuration,
+        indoorOutdoor: simSetting
+      });
       setAppliedSuccess(true);
     }
   };

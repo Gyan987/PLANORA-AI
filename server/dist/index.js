@@ -12,11 +12,30 @@ const aiRoutes_1 = __importDefault(require("./routes/aiRoutes"));
 const app = (0, express_1.default)();
 exports.app = app;
 const PORT = process.env.PORT || 5000;
+const rateLimiter_1 = require("./middleware/rateLimiter");
+// Allowed CORS origins
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+    : [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'https://planora-ai.netlify.app'
+    ];
 // Middleware
 app.use((0, cors_1.default)({
-    origin: '*',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, server-to-server, tests) or if in development/test
+        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*') || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        }
+        else {
+            callback(new Error('Blocked by CORS policy'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
 // Request logger
@@ -39,14 +58,23 @@ app.get('/health', (req, res) => {
         geminiConfigured: Boolean(process.env.GEMINI_API_KEY)
     });
 });
-// AI Routes
-app.use('/api/ai', aiRoutes_1.default);
+// API Abuse Protection: 100 requests per 15 minutes per IP
+const aiRateLimiter = (0, rateLimiter_1.createRateLimiter)({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 100,
+    message: 'AI request limit reached. Please wait a few moments before submitting more planning requests.'
+});
+// AI Routes with rate limiting protection
+app.use('/api/ai', aiRateLimiter, aiRoutes_1.default);
 // Global Error Handler
 app.use((err, req, res, next) => {
-    console.error('Unhandled server error:', err);
-    res.status(500).json({
+    if (process.env.NODE_ENV !== 'test') {
+        console.error('Unhandled server error:', err);
+    }
+    const isDev = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test';
+    res.status(err.status || 500).json({
         error: 'Internal Server Error',
-        message: err.message || 'An unexpected error occurred'
+        message: isDev ? (err.message || 'An unexpected error occurred') : 'An unexpected error occurred. Please try again later.'
     });
 });
 if (process.env.NODE_ENV !== 'test') {

@@ -48,8 +48,11 @@ export default async (req: Request) => {
     await handler({ body }, res);
   } catch (err: any) {
     console.error('Unhandled server error:', err);
+    const message = process.env.NODE_ENV === 'production'
+      ? 'An unexpected error occurred while processing your request. Please try again later.'
+      : (err?.message || 'An unexpected error occurred');
     return Response.json(
-      { error: 'Internal Server Error', message: err?.message || 'An unexpected error occurred' },
+      { error: 'Internal Server Error', message },
       { status: 500 }
     );
   }
